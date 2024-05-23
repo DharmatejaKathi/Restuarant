@@ -1,0 +1,8 @@
+.listItem {
+  list-style-type: none;
+}
+.tab-ul {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
