@@ -1,89 +1,145 @@
-import {Component} from 'react'
+import {useState, useEffect} from 'react'
 
-import './index.css'
-import Tabs from '../Tabs'
 import Header from '../Header'
 import DishItem from '../DishItem'
 
-class Home extends Component {
-  state = {restaurantDetails: [], activeId: '', categoryList: []}
+import './index.css'
 
-  componentDidMount() {
-    this.getItems()
-  }
+const Home = () => {
+  const [isLoading, setIsLoading] = useState(true)
+  const [response, setResponse] = useState([])
+  const [activeCategoryId, setActiveCategoryId] = useState('')
 
-  getItems = async () => {
-    const url = 'https://run.mocky.io/v3/72562bef-1d10-4cf5-bd26-8b0c53460a8e'
-    const response = await fetch(url)
+  const [cartItems, setCartItems] = useState([])
 
-    if (response.ok) {
-      const data = await response.json()
-      console.log(data)
-      const listData = data[0].table_menu_list.map(each => ({
-        menuCategory: each.menu_category,
-        menuCategoryId: each.menu_category_id,
-        menuCategoryImage: each.menu_category_image,
-        categoryDishes: each.category_dishes.map(dish => ({
-          dishAvailability: dish.dish_Availability,
-          dishType: dish.dish_Type,
-          dishCalories: dish.dish_calories,
-          dishDescription: dish.dish_description,
-          dishId: dish.dish_id,
-          dishImage: dish.dish_image,
-          dishName: dish.dish_name,
-          dishPrice: dish.dish_price,
-        })),
-      }))
-      this.setState({
-        restaurantDetails: listData,
-        activeId: listData[0].menuCategoryId,
-      })
+  const addItemToCart = dish => {
+    const isAlreadyExists = cartItems.find(item => item.dishId === dish.dishId)
+    if (!isAlreadyExists) {
+      const newDish = {...dish, quantity: 1}
+      setCartItems(prev => [...prev, newDish])
+    } else {
+      setCartItems(prev =>
+        prev.map(item =>
+          item.dishId === dish.dishId
+            ? {...item, quantity: item.quantity + 1}
+            : item,
+        ),
+      )
     }
   }
 
-  set = menuCategoryId => {
-    this.setState({activeId: menuCategoryId})
+  const removeItemFromCart = dish => {
+    const isAlreadyExists = cartItems.find(item => item.dishId === dish.dishId)
+    if (isAlreadyExists) {
+      setCartItems(prev =>
+        prev
+          .map(item =>
+            item.dishId === dish.dishId
+              ? {...item, quantity: item.quantity - 1}
+              : item,
+          )
+          .filter(item => item.quantity > 0),
+      )
+    }
   }
 
-  RenderTabList = () => {
-    const {restaurantDetails} = this.state
+  const getUpdatedData = tableMenuList =>
+    tableMenuList.map(eachMenu => ({
+      menuCategory: eachMenu.menu_category,
+      menuCategoryId: eachMenu.menu_category_id,
+      menuCategoryImage: eachMenu.menu_category_image,
+      categoryDishes: eachMenu.category_dishes.map(eachDish => ({
+        dishId: eachDish.dish_id,
+        dishName: eachDish.dish_name,
+        dishPrice: eachDish.dish_price,
+        dishImage: eachDish.dish_image,
+        dishCurrency: eachDish.dish_currency,
+        dishCalories: eachDish.dish_calories,
+        dishDescription: eachDish.dish_description,
+        dishAvailability: eachDish.dish_Availability,
+        dishType: eachDish.dish_Type,
+        addonCat: eachDish.addonCat,
+      })),
+    }))
+
+  const fetchRestaurantApi = async () => {
+    const api = 'https://run.mocky.io/v3/77a7e71b-804a-4fbd-822c-3e365d3482cc'
+    const apiResponse = await fetch(api)
+    const data = await apiResponse.json()
+    const updatedData = getUpdatedData(data[0].table_menu_list)
+    setResponse(updatedData)
+    setActiveCategoryId(updatedData[0].menuCategoryId)
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    fetchRestaurantApi()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const onUpdateActiveCategoryIdx = menuCategoryId =>
+    setActiveCategoryId(menuCategoryId)
+
+  const renderTabMenuList = () =>
+    response.map(eachCategory => {
+      const onClickHandler = () =>
+        onUpdateActiveCategoryIdx(eachCategory.menuCategoryId)
+
+      return (
+        <li
+          className={`each-tab-item ${
+            eachCategory.menuCategoryId === activeCategoryId
+              ? 'active-tab-item'
+              : ''
+          }`}
+          key={eachCategory.menuCategoryId}
+          onClick={onClickHandler}
+        >
+          <button
+            type="button"
+            className="mt-0 mb-0 ms-2 me-2 tab-category-button"
+          >
+            {eachCategory.menuCategory}
+          </button>
+        </li>
+      )
+    })
+
+  const renderDishes = () => {
+    const {categoryDishes} = response.find(
+      eachCategory => eachCategory.menuCategoryId === activeCategoryId,
+    )
+
     return (
-      <ul className="tab-ul">
-        {restaurantDetails.map(each => (
-          <Tabs details={each} key={each.menuCategoryId} set={this.set} />
+      <ul className="m-0 d-flex flex-column dishes-list-container">
+        {categoryDishes.map(eachDish => (
+          <DishItem
+            key={eachDish.dishId}
+            dishDetails={eachDish}
+            cartItems={cartItems}
+            addItemToCart={addItemToCart}
+            removeItemFromCart={removeItemFromCart}
+          />
         ))}
       </ul>
     )
   }
 
-  getList = () => {
-    const {restaurantDetails, activeId} = this.state
-    const filter = restaurantDetails.filter(
-      each => each.menuCategoryId === activeId,
-    )
-    console.log(filter)
+  const renderSpinner = () => (
+    <div className="spinner-container">
+      <div className="spinner-border" role="status" />
+    </div>
+  )
 
-    return (
-      <ul>
-        {filter.map(each => (
-          <DishItem itemDetails={each} key={each.menuCategoryId} />
-        ))}
-      </ul>
-    )
-  }
-
-  render() {
-    const {activeId, categoryList} = this.state
-    console.log(activeId)
-
-    return (
-      <div className="main-Container">
-        <Header />
-        {this.RenderTabList()}
-        {this.getList()}
-      </div>
-    )
-  }
+  return isLoading ? (
+    renderSpinner()
+  ) : (
+    <div className="home-background">
+      <Header cartItems={cartItems} />
+      <ul className="m-0 ps-0 d-flex tab-container">{renderTabMenuList()}</ul>
+      {renderDishes()}
+    </div>
+  )
 }
 
 export default Home
